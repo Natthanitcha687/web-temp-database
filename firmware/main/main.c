@@ -1,6 +1,6 @@
 // firmware/main/main.c
 #include <stdio.h>
-#include <string.h>                // <-- ต้องมีสำหรับ strcpy / strlen
+#include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
@@ -12,10 +12,13 @@
 
 #define WIFI_SSID  "Babytoonz"
 #define WIFI_PASS  "gartooninter1234"
-// *** แก้ช่องว่างออก ***  ห้ามมี space หลัง http://
 #define SERVER_URL "https://web-temp-backend.onrender.com/api/data"
 
 #define TAG "WEB_TEMP"
+
+// ประกาศ cert.pem ที่ฝังเข้ามา
+extern const char cert_pem_start[] asm("_binary_cert_pem_start");
+extern const char cert_pem_end[]   asm("_binary_cert_pem_end");
 
 static void wifi_init_sta(void) {
     ESP_ERROR_CHECK(esp_netif_init());
@@ -42,14 +45,14 @@ static void send_data(float temp, float hum) {
 
     esp_http_client_config_t config = {
         .url = SERVER_URL,
-        .transport_type = HTTP_TRANSPORT_OVER_TCP,
+        .cert_pem = cert_pem_start,   // ✅ ใส่ cert ที่ embed
+        .transport_type = HTTP_TRANSPORT_OVER_SSL,
         .timeout_ms = 8000,
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
     esp_http_client_set_method(client, HTTP_METHOD_POST);
     esp_http_client_set_header(client, "Content-Type", "application/json");
-    esp_http_client_set_header(client, "Accept", "application/json");
     esp_http_client_set_post_field(client, post_data, strlen(post_data));
 
     esp_err_t err = esp_http_client_perform(client);
@@ -57,7 +60,6 @@ static void send_data(float temp, float hum) {
         int status = esp_http_client_get_status_code(client);
         ESP_LOGI(TAG, "HTTP POST OK, Status=%d", status);
 
-        // (ออปชัน) อ่าน response body
         char buf[128];
         int n = esp_http_client_read(client, buf, sizeof(buf)-1);
         if (n > 0) { buf[n] = 0; ESP_LOGI(TAG, "Resp: %s", buf); }
@@ -71,13 +73,13 @@ void app_main(void) {
     ESP_ERROR_CHECK(nvs_flash_init());
     wifi_init_sta();
 
-    vTaskDelay(5000 / portTICK_PERIOD_MS); // รอให้ Wi-Fi ติดจริงก่อน
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
 
     while (1) {
         float temp = 25.0f + (esp_random() % 100) / 10.0f;
         float hum  = 50.0f + (esp_random() % 100) / 10.0f;
         ESP_LOGI(TAG, "Temp=%.1f Hum=%.1f", temp, hum);
         send_data(temp, hum);
-        vTaskDelay(15000 / portTICK_PERIOD_MS); // ทุก 15 วินาที
+        vTaskDelay(15000 / portTICK_PERIOD_MS);
     }
 }
