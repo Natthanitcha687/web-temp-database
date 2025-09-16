@@ -15,6 +15,10 @@ ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Tooltip,
 // ✅ Backend API (รวม /api ไว้แล้ว)
 const API_URL = "https://web-temp-backend.onrender.com/api";
 
+// ✅ helper function แปลงเวลาเป็นไทย
+const formatThaiTime = (ts) =>
+  ts ? new Date(ts).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" }) : "-";
+
 export default function App() {
   const [latest, setLatest] = useState(null);
   const [history, setHistory] = useState([]);
@@ -43,7 +47,10 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
-  const labels = history.map((h) => new Date(h.ts).toLocaleTimeString());
+  const labels = history.map((h) =>
+    new Date(h.ts).toLocaleTimeString("th-TH", { timeZone: "Asia/Bangkok" })
+  );
+
   const data = {
     labels,
     datasets: [
@@ -95,7 +102,7 @@ export default function App() {
         callbacks: {
           title: (items) => {
             const i = items[0].dataIndex;
-            return new Date(history[i].ts).toLocaleString();
+            return formatThaiTime(history[i].ts);
           },
           label: (ctx) => {
             const i = ctx.dataIndex;
@@ -160,9 +167,7 @@ export default function App() {
             <div>Temperature: {latest.temperature?.toFixed?.(1)} °C</div>
             <div>Humidity: {latest.humidity?.toFixed?.(1)} %</div>
             <div>Device: {latest.deviceId || "-"}</div>
-            <div>
-              Time: {latest.ts ? new Date(latest.ts).toLocaleString() : "-"}
-            </div>
+            <div>Time: {formatThaiTime(latest.ts)}</div>
           </div>
         ) : (
           <div>Waiting for data…</div>
@@ -182,7 +187,7 @@ export default function App() {
           }}
         >
           <strong>Selected point</strong>
-          <div>Time: {new Date(selected.ts).toLocaleString()}</div>
+          <div>Time: {formatThaiTime(selected.ts)}</div>
           <div>Temperature: {selected.temperature?.toFixed?.(1)} °C</div>
           <div>Humidity: {selected.humidity?.toFixed?.(1)} %</div>
           <div>Device: {selected.deviceId || "-"}</div>
