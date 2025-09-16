@@ -12,8 +12,10 @@ import {
 
 ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend);
 
-const API_URL = "https://web-temp-frontend.onrender.com/api";
-
+// ❌ ของเดิมผิด: frontend
+// const API_URL = "https://web-temp-frontend.onrender.com/api";
+// ✅ ต้องใช้ backend
+const API_URL = "https://web-temp-backend.onrender.com";
 
 export default function App() {
   const [latest, setLatest] = useState(null);
@@ -22,16 +24,19 @@ export default function App() {
   const chartRef = useRef(null);
 
   const fetchData = async () => {
-    const [resLatest, resHist] = await Promise.all([
-      fetch(`${API_URL}/api/latest`),
-      fetch(`${API_URL}/api/history?limit=50`),
-    ]);
-    const latestData = await resLatest.json();
-    const histData = await resHist.json();
-    setLatest(latestData);
-    setHistory(histData);
-    // ถ้าเพิ่งเข้ามา ให้เลือกจุดล่าสุดเป็น default
-    if (histData?.length) setSelected(histData[histData.length - 1]);
+    try {
+      const [resLatest, resHist] = await Promise.all([
+        fetch(`${API_URL}/api/latest`),
+        fetch(`${API_URL}/api/history?limit=50`),
+      ]);
+      const latestData = await resLatest.json();
+      const histData = await resHist.json();
+      setLatest(latestData);
+      setHistory(histData);
+      if (histData?.length) setSelected(histData[histData.length - 1]);
+    } catch (err) {
+      console.error("Fetch error:", err);
+    }
   };
 
   useEffect(() => {
@@ -70,10 +75,14 @@ export default function App() {
   const handleClick = (evt) => {
     const chart = chartRef.current;
     if (!chart) return;
-    // หาจุดที่ใกล้ที่สุดที่ถูกคลิก
-    const points = chart.getElementsAtEventForMode(evt.native || evt, "nearest", { intersect: true }, true);
+    const points = chart.getElementsAtEventForMode(
+      evt.native || evt,
+      "nearest",
+      { intersect: true },
+      true
+    );
     if (points.length) {
-      const index = points[0].index; // index เดียวกันทั้ง 2 datasets
+      const index = points[0].index;
       setSelected(history[index]);
     }
   };
@@ -93,7 +102,6 @@ export default function App() {
           label: (ctx) => {
             const i = ctx.dataIndex;
             const r = history[i];
-            // แสดงทั้งคู่ใน tooltip ไม่ว่าชี้ dataset ไหน
             return [
               `Temp: ${r.temperature?.toFixed?.(1)} °C`,
               `Humidity: ${r.humidity?.toFixed?.(1)} %`,
@@ -122,7 +130,6 @@ export default function App() {
       },
     },
     onClick: handleClick,
-    // ทำให้เคอร์เซอร์เป็น pointer เมื่อชี้โดนจุด
     onHover: (evt, el) => {
       const canvas = (evt.native || evt).target;
       canvas.style.cursor = el.length ? "pointer" : "default";
@@ -130,17 +137,34 @@ export default function App() {
   };
 
   return (
-    <div style={{ fontFamily: "Inter, system-ui, sans-serif", padding: 24, background: "#0b1020", minHeight: "100vh" }}>
+    <div
+      style={{
+        fontFamily: "Inter, system-ui, sans-serif",
+        padding: 24,
+        background: "#0b1020",
+        minHeight: "100vh",
+      }}
+    >
       <h1 style={{ color: "white", marginBottom: 16 }}>Web Temp Dashboard</h1>
 
-      <section style={{ background: "#0f1830", color: "white", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+      <section
+        style={{
+          background: "#0f1830",
+          color: "white",
+          borderRadius: 12,
+          padding: 16,
+          marginBottom: 16,
+        }}
+      >
         <h2 style={{ marginTop: 0 }}>Latest</h2>
         {latest ? (
           <div>
             <div>Temperature: {latest.temperature?.toFixed?.(1)} °C</div>
             <div>Humidity: {latest.humidity?.toFixed?.(1)} %</div>
             <div>Device: {latest.deviceId || "-"}</div>
-            <div>Time: {latest.ts ? new Date(latest.ts).toLocaleString() : "-"}</div>
+            <div>
+              Time: {latest.ts ? new Date(latest.ts).toLocaleString() : "-"}
+            </div>
           </div>
         ) : (
           <div>Waiting for data…</div>
@@ -167,7 +191,14 @@ export default function App() {
         </section>
       )}
 
-      <div style={{ background: "#121212", borderRadius: 12, height: 420, padding: 16 }}>
+      <div
+        style={{
+          background: "#121212",
+          borderRadius: 12,
+          height: 420,
+          padding: 16,
+        }}
+      >
         <Line ref={chartRef} data={data} options={options} />
       </div>
     </div>
