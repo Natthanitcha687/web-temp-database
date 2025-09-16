@@ -13,7 +13,7 @@
 #define WIFI_SSID  "Babytoonz"
 #define WIFI_PASS  "gartooninter1234"
 // *** แก้ช่องว่างออก ***  ห้ามมี space หลัง http://
-#define SERVER_URL "http://172.20.10.2:3000/api/data"
+#define SERVER_URL "https://web-temp-backend.onrender.com/api/data"
 
 #define TAG "WEB_TEMP"
 
