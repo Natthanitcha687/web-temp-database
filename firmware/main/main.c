@@ -9,16 +9,25 @@
 #include "esp_event.h"
 #include "esp_netif.h"
 #include "esp_http_client.h"
+#include "esp_crt_bundle.h"   // ✅ สำคัญ
 
 #define WIFI_SSID  "Babytoonz"
 #define WIFI_PASS  "gartooninter1234"
 #define SERVER_URL "https://web-temp-backend.onrender.com/api/data"
-
 #define TAG "WEB_TEMP"
 
-// ประกาศ cert.pem ที่ฝังเข้ามา
-extern const char cert_pem_start[] asm("_binary_cert_pem_start");
-extern const char cert_pem_end[]   asm("_binary_cert_pem_end");
+static EventGroupHandle_t s_wifi_event_group;
+#define WIFI_CONNECTED_BIT BIT0
+
+static void event_handler(void* arg, esp_event_base_t base, int32_t id, void* data){
+    if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
+        esp_wifi_connect();
+    } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
+        xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+    } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
+        esp_wifi_connect();
+    }
+}
 
 static void wifi_init_sta(void) {
     ESP_ERROR_CHECK(esp_netif_init());
@@ -27,14 +36,20 @@ static void wifi_init_sta(void) {
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL));
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 
     wifi_config_t wifi_config = { 0 };
     strcpy((char*)wifi_config.sta.ssid, WIFI_SSID);
     strcpy((char*)wifi_config.sta.password, WIFI_PASS);
+    wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
-    ESP_ERROR_CHECK(esp_wifi_connect());
+
+    s_wifi_event_group = xEventGroupCreate();
+    // ✅ รอจนได้ IP ก่อนค่อยยิง HTTP
+    xEventGroupWaitBits(s_wifi_event_group, WIFI_CONNECTED_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
 }
 
 static void send_data(float temp, float hum) {
@@ -45,8 +60,8 @@ static void send_data(float temp, float hum) {
 
     esp_http_client_config_t config = {
         .url = SERVER_URL,
-        .cert_pem = cert_pem_start,   // ✅ ใส่ cert ที่ embed
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
+        .crt_bundle_attach = esp_crt_bundle_attach,   // ✅ ใช้ bundle
         .timeout_ms = 8000,
     };
 
@@ -57,12 +72,7 @@ static void send_data(float temp, float hum) {
 
     esp_err_t err = esp_http_client_perform(client);
     if (err == ESP_OK) {
-        int status = esp_http_client_get_status_code(client);
-        ESP_LOGI(TAG, "HTTP POST OK, Status=%d", status);
-
-        char buf[128];
-        int n = esp_http_client_read(client, buf, sizeof(buf)-1);
-        if (n > 0) { buf[n] = 0; ESP_LOGI(TAG, "Resp: %s", buf); }
+        ESP_LOGI(TAG, "HTTP POST OK, Status=%d", esp_http_client_get_status_code(client));
     } else {
         ESP_LOGE(TAG, "HTTP POST failed: %s", esp_err_to_name(err));
     }
@@ -72,14 +82,11 @@ static void send_data(float temp, float hum) {
 void app_main(void) {
     ESP_ERROR_CHECK(nvs_flash_init());
     wifi_init_sta();
-
-    vTaskDelay(5000 / portTICK_PERIOD_MS);
-
     while (1) {
         float temp = 25.0f + (esp_random() % 100) / 10.0f;
         float hum  = 50.0f + (esp_random() % 100) / 10.0f;
         ESP_LOGI(TAG, "Temp=%.1f Hum=%.1f", temp, hum);
         send_data(temp, hum);
-        vTaskDelay(15000 / portTICK_PERIOD_MS);
+        vTaskDelay(pdMS_TO_TICKS(15000));
     }
 }
