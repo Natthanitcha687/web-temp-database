@@ -21,10 +21,7 @@ if (!process.env.MONGODB_URI) {
   process.exit(1); // หยุดถ้าไม่เจอ env
 }
 
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
+mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log("✅ MongoDB connected"))
   .catch(err => console.error("❌ MongoDB error:", err));
 
@@ -33,7 +30,7 @@ const readingSchema = new mongoose.Schema({
   temperature: Number,
   humidity: Number,
   deviceId: String,
-  ts: { type: Date, default: Date.now }
+  ts: { type: Date, default: Date.now } // จะถูก override ถ้า ESP32 ส่งมาเอง
 });
 const Reading = mongoose.model('Reading', readingSchema);
 
@@ -45,8 +42,15 @@ app.get('/', (req, res) => {
 // ✅ Save data from ESP32
 app.post('/api/data', async (req, res) => {
   try {
-    const { temperature, humidity, deviceId } = req.body;
-    const reading = new Reading({ temperature, humidity, deviceId });
+    const { temperature, humidity, deviceId, ts } = req.body;
+
+    const reading = new Reading({
+      temperature,
+      humidity,
+      deviceId,
+      ts: ts ? new Date(ts) : new Date() // ✅ ใช้เวลาที่ ESP32 ส่งมา (ISO/epoch) ถ้ามี
+    });
+
     await reading.save();
 
     // broadcast ผ่าน WebSocket
