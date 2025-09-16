@@ -12,7 +12,8 @@ import {
 
 ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend);
 
-const API_URL = "http://localhost:3000"; // ถ้า deploy แล้วค่อยเปลี่ยนเป็น URL จริง
+const API_URL = "https://web-temp-frontend.onrender.com/api";
+
 
 export default function App() {
   const [latest, setLatest] = useState(null);
