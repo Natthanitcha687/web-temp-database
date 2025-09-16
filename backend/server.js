@@ -8,11 +8,19 @@ import { WebSocketServer } from 'ws';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors({ origin: "*" })); // เปิดทุก origin (frontend จะเรียกได้แน่นอน)
+app.use(cors({ origin: "*" })); // frontend เรียกได้แน่นอน
 app.use(express.json());
 app.use(morgan('dev'));
 
+// ✅ Debug Env
+console.log("🔍 MONGODB_URI =", process.env.MONGODB_URI ? "Loaded ✅" : "❌ Undefined");
+
 // ✅ MongoDB Connect
+if (!process.env.MONGODB_URI) {
+  console.error("❌ Missing MONGODB_URI environment variable");
+  process.exit(1); // หยุดถ้าไม่เจอ env
+}
+
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
@@ -56,15 +64,23 @@ app.post('/api/data', async (req, res) => {
 
 // ✅ Get latest
 app.get('/api/latest', async (req, res) => {
-  const last = await Reading.findOne().sort({ ts: -1 });
-  res.json(last || {});
+  try {
+    const last = await Reading.findOne().sort({ ts: -1 });
+    res.json(last || {});
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ✅ Get history
 app.get('/api/history', async (req, res) => {
-  const limit = parseInt(req.query.limit || '100', 10);
-  const data = await Reading.find().sort({ ts: -1 }).limit(limit);
-  res.json(data.reverse());
+  try {
+    const limit = parseInt(req.query.limit || '100', 10);
+    const data = await Reading.find().sort({ ts: -1 }).limit(limit);
+    res.json(data.reverse());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ✅ Start HTTP server
