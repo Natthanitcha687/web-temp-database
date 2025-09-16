@@ -12,10 +12,8 @@ import {
 
 ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend);
 
-// ❌ ของเดิมผิด: frontend
-// const API_URL = "https://web-temp-frontend.onrender.com/api";
-// ✅ ต้องใช้ backend
-const API_URL = "https://web-temp-backend.onrender.com";
+// ✅ Backend API (รวม /api ไว้แล้ว)
+const API_URL = "https://web-temp-backend.onrender.com/api";
 
 export default function App() {
   const [latest, setLatest] = useState(null);
@@ -26,8 +24,8 @@ export default function App() {
   const fetchData = async () => {
     try {
       const [resLatest, resHist] = await Promise.all([
-        fetch(`${API_URL}/api/latest`),
-        fetch(`${API_URL}/api/history?limit=50`),
+        fetch(`${API_URL}/latest`),
+        fetch(`${API_URL}/history?limit=50`),
       ]);
       const latestData = await resLatest.json();
       const histData = await resHist.json();
